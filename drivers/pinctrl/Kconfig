@@ -287,6 +287,16 @@ config PINCTRL_LOONGSON2
 	 pull-down functions are not supported. Say yes to enable
 	 pinctrl for Loongson-2 SoC.
 
+config PINCTRL_LS2K300
+	bool "Pinctrl driver for the Microsemi Ocelot SoCs"
+	default y
+	depends on OF
+	select GPIOLIB
+	select GPIOLIB_IRQCHIP
+	select GENERIC_PINCONF
+	select GENERIC_PINCTRL_GROUPS
+	select GENERIC_PINMUX_FUNCTIONS
+
 config PINCTRL_XWAY
 	bool
 	depends on SOC_TYPE_XWAY

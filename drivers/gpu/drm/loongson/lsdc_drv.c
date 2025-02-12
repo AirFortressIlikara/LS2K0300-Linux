@@ -5,6 +5,7 @@
 
 #include <linux/pci.h>
 #include <linux/vgaarb.h>
+#include <linux/of_address.h>
 
 #include <drm/drm_aperture.h>
 #include <drm/drm_atomic.h>
@@ -16,6 +17,9 @@
 #include <drm/drm_modeset_helper.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_vblank.h>
+
+#include <linux/platform_device.h>
+#include <linux/of_device.h>
 
 #include "loongson_module.h"
 #include "lsdc_drv.h"
@@ -84,6 +88,8 @@ static int lsdc_modeset_init(struct lsdc_device *ldev,
 		dispipe = &ldev->dispipe[i];
 		if (dispipe->li2c)
 			ddc = &dispipe->li2c->adapter;
+		else
+			ddc = dispipe->adapter;
 
 		ret = funcs->output_init(ddev, dispipe, ddc, i);
 		if (ret)
@@ -155,8 +161,7 @@ static int lsdc_mode_config_init(struct drm_device *ddev,
  * the DC could access the on-board VRAM.
  */
 static int lsdc_get_dedicated_vram(struct lsdc_device *ldev,
-				   struct pci_dev *pdev_dc,
-				   const struct lsdc_desc *descp)
+				   struct pci_dev *pdev_dc)
 {
 	struct drm_device *ddev = &ldev->base;
 	struct pci_dev *pdev_gpu;
@@ -187,16 +192,50 @@ static int lsdc_get_dedicated_vram(struct lsdc_device *ldev,
 	return (size > SZ_1M) ? 0 : -ENODEV;
 }
 
+static int lsdc_of_get_reserved_mem(struct lsdc_device *ldev)
+{
+	struct drm_device *ddev = &ldev->base;
+	unsigned long size = 0;
+	struct device_node *node;
+	struct resource r;
+	int ret;
+
+	if (!ddev->dev->of_node)
+		return -ENOENT;
+
+	node = of_parse_phandle(ddev->dev->of_node, "memory-region", 0);
+	if (!node) {
+		drm_err(ddev, "No memory-region property\n");
+		return -ENOENT;
+	}
+
+	ret = of_address_to_resource(node, 0, &r);
+	of_node_put(node);
+	if (ret)
+		return ret;
+
+	size = r.end - r.start + 1;
+
+	ldev->vram_base = r.start;
+	ldev->vram_size = size;
+
+	drm_info(ddev, "Using of reserved mem: %lx@%pa\n", size, &r.start);
+
+	return 0;
+}
+
 static struct lsdc_device *
-lsdc_create_device(struct pci_dev *pdev,
+lsdc_create_device(struct device *dev,
 		   const struct lsdc_desc *descp,
-		   const struct drm_driver *driver)
+		const struct drm_driver *driver,
+		struct pci_dev *pdev,
+	struct platform_device *pfdev)
 {
 	struct lsdc_device *ldev;
 	struct drm_device *ddev;
 	int ret;
 
-	ldev = devm_drm_dev_alloc(&pdev->dev, driver, struct lsdc_device, base);
+	ldev = devm_drm_dev_alloc(dev, driver, struct lsdc_device, base);
 	if (IS_ERR(ldev))
 		return ldev;
 
@@ -207,7 +246,22 @@ lsdc_create_device(struct pci_dev *pdev,
 
 	loongson_gfxpll_create(ddev, &ldev->gfxpll);
 
-	ret = lsdc_get_dedicated_vram(ldev, pdev, descp);
+	if (descp->has_dedicated_vram)
+		ret = lsdc_get_dedicated_vram(ldev, pdev);
+	else {
+		ret = lsdc_of_get_reserved_mem(ldev);
+		if (ret) {
+			dma_addr_t  daddr = 0;
+			void *vaddr;
+			ldev->vram_size = 0x900000;
+			vaddr = dma_alloc_wc(dev, ldev->vram_size, &daddr,
+						GFP_KERNEL | __GFP_NOWARN);
+
+			ret = !vaddr;
+			ldev->vram_base = daddr;
+		}
+	}
+
 	if (ret) {
 		drm_err(ddev, "Init VRAM failed: %d\n", ret);
 		return ERR_PTR(ret);
@@ -230,7 +284,13 @@ lsdc_create_device(struct pci_dev *pdev,
 	lsdc_gem_init(ddev);
 
 	/* Bar 0 of the DC device contains the MMIO register's base address */
-	ldev->reg_base = pcim_iomap(pdev, 0, 0);
+	if (pdev)
+		ldev->reg_base = pcim_iomap(pdev, 0, 0);
+	else {
+		struct resource *res;
+		res = platform_get_resource(pfdev, IORESOURCE_MEM, 0);
+		ldev->reg_base = devm_ioremap_resource(dev, res);
+	}
 	if (!ldev->reg_base)
 		return ERR_PTR(-ENODEV);
 
@@ -281,7 +341,7 @@ static int lsdc_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev_info(&pdev->dev, "Found %s, revision: %u",
 		 to_loongson_gfx(descp)->model, pdev->revision);
 
-	ldev = lsdc_create_device(pdev, descp, &lsdc_drm_driver);
+	ldev = lsdc_create_device(&pdev->dev, descp, &lsdc_drm_driver, pdev, NULL);
 	if (IS_ERR(ldev))
 		return PTR_ERR(ldev);
 
@@ -460,3 +520,85 @@ MODULE_DEVICE_TABLE(pci, lsdc_pciid_list);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
+
+static const struct of_device_id lsdc_dt_ids[] = {
+	{ .compatible = "loongson,la2k0300-dc", .data = (void *)CHIP_LS2K0300, },
+	{}
+};
+
+static int lsdc_platform_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	const struct lsdc_desc *descp = NULL;
+	const struct of_device_id *of_id;
+	struct lsdc_device *ldev;
+	struct drm_device *ddev;
+	int ret;
+
+	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+	if (ret) {
+		dev_err(dev, "Failed to set dma mask\n");
+		return ret;
+	}
+
+	of_id = of_match_device(lsdc_dt_ids, dev);
+	if (of_id && of_id->data)
+		descp = lsdc_device_probe(NULL, (enum loongson_chip_id)of_id->data);
+
+	if (!descp) {
+		dev_err(dev, "unknown dc chip core\n");
+		return -ENOENT;
+	}
+
+	ldev = lsdc_create_device(&pdev->dev, descp, &lsdc_drm_driver, NULL, pdev);
+	if (IS_ERR(ldev))
+		return PTR_ERR(ldev);
+
+	ddev = &ldev->base;
+
+	platform_set_drvdata(pdev, ddev);
+	drm_kms_helper_poll_init(ddev);
+
+	if (loongson_vblank) {
+		int irq;
+		ret = drm_vblank_init(ddev, descp->num_of_crtc);
+		if (ret)
+			return ret;
+
+		irq = platform_get_irq(pdev, 0);
+		ret = devm_request_irq(&pdev->dev, irq,
+				       descp->funcs->irq_handler,
+				       IRQF_SHARED /* | IRQF_TRIGGER_RISING */,
+				       dev_name(&pdev->dev), ddev);
+		if (ret) {
+			drm_err(ddev, "Failed to register interrupt: %d\n", ret);
+			return ret;
+		}
+
+		drm_info(ddev, "registered irq: %u\n", irq);
+	}
+
+	ret = drm_dev_register(ddev, 0);
+	if (ret)
+		return ret;
+
+	drm_fbdev_generic_setup(ddev, 32);
+
+	return 0;
+}
+
+static int lsdc_platform_remove(struct platform_device *pdev)
+{
+	return 0;
+}
+struct platform_driver lsdc_platform_driver = {
+	.probe = lsdc_platform_probe,
+	.remove = lsdc_platform_remove,
+	.driver = {
+		.name = "lsdc",
+		.pm = &lsdc_pm_ops,
+		.of_match_table = of_match_ptr(lsdc_dt_ids),
+	},
+};
+
+MODULE_DEVICE_TABLE(of, lsdc_dt_ids);

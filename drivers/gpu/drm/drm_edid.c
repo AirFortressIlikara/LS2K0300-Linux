@@ -300,6 +300,13 @@ static const struct drm_display_mode drm_dmt_modes[] = {
 	{ DRM_MODE("848x480", DRM_MODE_TYPE_DRIVER, 33750, 848, 864,
 		   976, 1088, 0, 480, 486, 494, 517, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) },
+	/*
+	 * Modeline "1024x600_60.00"  48.96  1024 1064 1168 1312  600 601 604 622  -HSync +Vsync
+	 */
+	/* 0x0f - 1024x600@60Hz, interlace */
+	{ DRM_MODE("1024x600", DRM_MODE_TYPE_DRIVER, 44960, 1024, 1064,
+		   1186, 1312, 0, 600, 601, 604, 622, 0,
+		   DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC) },
 	/* 0x0f - 1024x768@43Hz, interlace */
 	{ DRM_MODE("1024x768i", DRM_MODE_TYPE_DRIVER, 44900, 1024, 1032,
 		   1208, 1264, 0, 768, 768, 776, 817, 0,

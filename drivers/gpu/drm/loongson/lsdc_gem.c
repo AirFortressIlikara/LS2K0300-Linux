@@ -229,6 +229,8 @@ int lsdc_dumb_create(struct drm_file *file, struct drm_device *ddev,
 	size = pitch * args->height;
 	size = ALIGN(size, PAGE_SIZE);
 
+	pr_err("width=%d height=%d bpp=%d size=0x%x vram_size=0x%x\n", args->width, args->height,
+		args->bpp, size, ldev->vram_size);
 	/* Maximum single bo size allowed is the half vram size available */
 	if (size > ldev->vram_size / 2) {
 		drm_err(ddev, "Requesting(%zuMiB) failed\n", size >> 20);

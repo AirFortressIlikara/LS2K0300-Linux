@@ -9,6 +9,7 @@ obj-$(CONFIG_CAN_SLCAN)		+= slcan/
 
 obj-y				+= dev/
 obj-y				+= esd/
+obj-y				+= ls_can/
 obj-y				+= rcar/
 obj-y				+= spi/
 obj-y				+= usb/

@@ -5,6 +5,8 @@
 
 # Object files in subdirectories
 
+subdir-ccflags-y                := -DDEBUG 
+
 obj-$(CONFIG_USB_COMMON)	+= common/
 obj-$(CONFIG_USB)		+= core/
 obj-$(CONFIG_USB_SUPPORT)	+= phy/

@@ -933,13 +933,13 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
 		/*
 		 * Fetch SCR from card.
 		 */
-		err = mmc_app_send_scr(card);
-		if (err)
-			return err;
+		// err = mmc_app_send_scr(card);
+		// if (err)
+		// 	return err;
 
-		err = mmc_decode_scr(card);
-		if (err)
-			return err;
+		// err = mmc_decode_scr(card);
+		// if (err)
+		// 	return err;
 
 		/*
 		 * Fetch and process SD Status register.

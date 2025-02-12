@@ -306,6 +306,8 @@ const struct of_device_id dwc2_of_match_table[] = {
 	  .data = dwc2_set_stm32mp15_hsotg_params },
 	{ .compatible = "intel,socfpga-agilex-hsotg",
 	  .data = dwc2_set_socfpga_agilex_params },
+	{ .compatible = "loongson,loongson2-dwc2",
+	  .data = dwc2_set_loongson_params },
 	{},
 };
 MODULE_DEVICE_TABLE(of, dwc2_of_match_table);

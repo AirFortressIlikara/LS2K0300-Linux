@@ -585,6 +585,22 @@ static void __init prefill_possible_map(void)
 }
 #endif
 
+#ifdef CONFIG_BLK_DEV_INITRD
+static int __init rd_start_early(char *p)
+{
+	phys_initrd_start = __pa(memparse(p, &p));
+	return 0;
+}
+early_param("rd_start", rd_start_early);
+
+static int __init rd_size_early(char *p)
+{
+	phys_initrd_size = memparse(p, &p);
+
+	return 0;
+}
+early_param("rd_size", rd_size_early);
+#endif
 void __init setup_arch(char **cmdline_p)
 {
 	cpu_probe();

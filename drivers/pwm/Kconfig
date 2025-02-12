@@ -704,6 +704,14 @@ config PWM_VT8500
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-vt8500.
 
+config PWM_LS2K300
+	tristate "Loongson PWM support"
+	help
+	  Generic PWM framework driver for loongson3.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-ls.
+
 config PWM_XILINX
 	tristate "Xilinx AXI Timer PWM support"
 	depends on OF_ADDRESS

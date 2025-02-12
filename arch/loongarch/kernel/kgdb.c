@@ -201,6 +201,7 @@ void sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *p)
 	gdb_regs[DBG_LOONGARCH_RA] = p->thread.reg01;
 	gdb_regs[DBG_LOONGARCH_TP] = (long)p;
 	gdb_regs[DBG_LOONGARCH_SP] = p->thread.reg03;
+	gdb_regs[DBG_LOONGARCH_FP] = p->thread.reg22;
 
 	/* S0 - S8 */
 	gdb_regs[DBG_LOONGARCH_S0] = p->thread.reg23;

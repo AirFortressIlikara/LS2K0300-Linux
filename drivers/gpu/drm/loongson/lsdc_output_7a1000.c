@@ -54,9 +54,9 @@ static int ls7a1000_dpi_connector_get_modes(struct drm_connector *conn)
 		return num;
 	}
 
-	num = drm_add_modes_noedid(conn, 1920, 1200);
+	num = drm_add_modes_noedid(conn, 1024, 600);
 
-	drm_set_preferred_mode(conn, 1024, 768);
+	drm_set_preferred_mode(conn, 1024, 600);
 
 	return num;
 }

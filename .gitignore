@@ -171,3 +171,6 @@ sphinx_*/
 
 # Rust analyzer configuration
 /rust-project.json
+
+!/drivers/net/can/ls_can/lscanfd_dma.elf
+!/drivers/net/can/ls_can/lscanfd_platform.elf

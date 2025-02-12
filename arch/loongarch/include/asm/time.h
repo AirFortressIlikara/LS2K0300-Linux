@@ -9,6 +9,8 @@
 #include <linux/clocksource.h>
 #include <asm/loongarch.h>
 
+extern spinlock_t rtc_lock;
+
 extern u64 cpu_clock_freq;
 extern u64 const_clock_freq;
 
