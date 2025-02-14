@@ -146,7 +146,7 @@
 };
 
 &i2c1 {
-	status = "okay";
+	status = "disabled";
 	clock-frequency = <400000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c1_mux_m0>;
@@ -205,6 +205,22 @@
 
 &spi1 {
 	status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&spi1_4bit>;
+
+    st7735r@0{
+        status = "okay";
+        compatible = "sitronix,st7735r";
+        buswidth = <8>;
+        rotate = <90>;
+        fps = <50>;
+        rgb;
+        dc-gpios = <&gpa3 3 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&gpa3 2 GPIO_ACTIVE_HIGH>;
+        spi-max-frequency = <100000000>;
+        reg = <0>;
+        debug = <0>;
+    };
 };
 
 &spi2 {

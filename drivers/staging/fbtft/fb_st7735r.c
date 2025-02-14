@@ -85,6 +85,10 @@ static const s16 default_init_sequence[] = {
 
 static void set_addr_win(struct fbtft_par *par, int xs, int ys, int xe, int ye)
 {
+	xs += 1;
+	xe += 1;
+	ys += 2;
+	ye += 2;
 	write_reg(par, MIPI_DCS_SET_COLUMN_ADDRESS,
 		  xs >> 8, xs & 0xFF, xe >> 8, xe & 0xFF);
 

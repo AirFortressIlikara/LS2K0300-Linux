@@ -508,11 +508,10 @@
 
 		spi1: spi@0x16018000 {
 			status = "disabled";
-			compatible = "ls,ls-qspi";
+			compatible = "loongson,ls2k1000-spi";
 			reg = <0 0x16018000 0 0x10>;
 			interrupt-parent = <&icu>;
 			interrupts = <45>;
-			reg-names = "qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
 		};
