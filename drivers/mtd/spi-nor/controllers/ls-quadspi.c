@@ -94,7 +94,7 @@ struct ls_qspi {
 };
 
 struct ls_qspi_cmd {
-        u8 addr_width;
+        u8 addr_nbytes;
         u8 dummy;
         bool tx_data;
         u8 opcode;
@@ -248,12 +248,12 @@ static int ls_qspi_tx_poll(struct ls_qspi *qspi,
 
 	qspi_writeb(qspi,QSPI_DR,cmd->opcode);
 
-	if(cmd->addr_width){
-		if(cmd->addr_width ==3){
+	if(cmd->addr_nbytes){
+		if(cmd->addr_nbytes ==3){
 			qspi_writeb(qspi,QSPI_DR,(uint8_t)(cmd->addr >>16));
 			qspi_writeb(qspi,QSPI_DR,(uint8_t)(cmd->addr >>8));
 			qspi_writeb(qspi,QSPI_DR,(uint8_t)(cmd->addr));
-		}else if(cmd->addr_width ==4){
+		}else if(cmd->addr_nbytes ==4){
 			qspi_writeb(qspi,QSPI_DR,(uint8_t)(cmd->addr >>24));
 			qspi_writeb(qspi,QSPI_DR,(uint8_t)(cmd->addr >>16));
 			qspi_writeb(qspi,QSPI_DR,(uint8_t)(cmd->addr >>8));
@@ -319,7 +319,7 @@ abort:
 }
 
 static int ls_qspi_read_reg(struct spi_nor *nor,
-                               u8 opcode, u8 *buf, int len)
+                               u8 opcode, u8 *buf, size_t len)
 {
         struct ls_qspi_flash *flash = nor->priv;
         struct device *dev = flash->qspi->dev;
@@ -340,7 +340,7 @@ static int ls_qspi_read_reg(struct spi_nor *nor,
 }
 
 static int ls_qspi_write_reg(struct spi_nor *nor, u8 opcode,
-                                u8 *buf, int len)
+                                const u8 *buf, size_t len)
 {
         struct ls_qspi_flash *flash = nor->priv;
         struct device *dev = flash->qspi->dev;
@@ -373,7 +373,7 @@ static ssize_t ls_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
 
         memset(&cmd, 0, sizeof(cmd));
         cmd.opcode = nor->read_opcode;
-        cmd.addr_width = nor->addr_width;
+        cmd.addr_nbytes = nor->addr_nbytes;
         cmd.addr = (u32)from;
         cmd.tx_data = true;
         cmd.dummy = nor->read_dummy;
@@ -400,7 +400,7 @@ static ssize_t ls_qspi_write(struct spi_nor *nor, loff_t to, size_t len,
 
         memset(&cmd, 0, sizeof(cmd));
         cmd.opcode = nor->program_opcode;
-        cmd.addr_width = nor->addr_width;
+        cmd.addr_nbytes = nor->addr_nbytes;
         cmd.addr = (u32)to;
         cmd.tx_data = true;
         cmd.len = len;
@@ -423,7 +423,7 @@ static int ls_qspi_erase(struct spi_nor *nor, loff_t offs)
 
         memset(&cmd, 0, sizeof(cmd));
         cmd.opcode = nor->erase_opcode;
-        cmd.addr_width = nor->addr_width;
+        cmd.addr_nbytes = nor->addr_nbytes;
         cmd.addr = (u32)offs;
         cmd.qspimode = FMODE_INDW;
 
@@ -432,7 +432,7 @@ static int ls_qspi_erase(struct spi_nor *nor, loff_t offs)
         return ls_qspi_send(flash, &cmd);
 }
 
-static int ls_qspi_prep(struct spi_nor *nor, enum spi_nor_ops ops)
+static int ls_qspi_prep(struct spi_nor *nor)
 {
         struct ls_qspi_flash *flash = nor->priv;
         struct ls_qspi *qspi = flash->qspi;
@@ -441,13 +441,22 @@ static int ls_qspi_prep(struct spi_nor *nor, enum spi_nor_ops ops)
         return 0;
 }
 
-static void ls_qspi_unprep(struct spi_nor *nor, enum spi_nor_ops ops)
+static void ls_qspi_unprep(struct spi_nor *nor)
 {
         struct ls_qspi_flash *flash = nor->priv;
         struct ls_qspi *qspi = flash->qspi;
 
         mutex_unlock(&qspi->lock);
 }
+
+static const struct spi_nor_controller_ops ls_controller_ops = {
+	.prepare = ls_qspi_prep,
+	.unprepare = ls_qspi_unprep,
+	.read_reg = ls_qspi_read_reg,
+	.write_reg = ls_qspi_write_reg,
+	.read = ls_qspi_read,
+	.write = ls_qspi_write,
+};
 
 static int ls_qspi_flash_setup(struct ls_qspi *qspi,
                                   struct device_node *np)
@@ -500,13 +509,7 @@ static int ls_qspi_flash_setup(struct ls_qspi *qspi,
 	flash->nor.priv = flash;
 	mtd = &flash->nor.mtd;
 
-	flash->nor.read = ls_qspi_read;
-	flash->nor.write = ls_qspi_write;
-	flash->nor.erase = ls_qspi_erase;
-	flash->nor.read_reg = ls_qspi_read_reg;
-	flash->nor.write_reg = ls_qspi_write_reg;
-	flash->nor.prepare = ls_qspi_prep;
-	flash->nor.unprepare = ls_qspi_unprep;
+	flash->nor.controller_ops = &ls_controller_ops;
 
 	/*Switch to QSPI mode*/
 	qspi_set_bit(qspi,QSPI_RSSR,QSPI_RSSR_SPACE);
