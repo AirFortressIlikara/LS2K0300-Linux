@@ -59,10 +59,11 @@ endif
 
 ifdef CONFIG_64BIT
 ld-emul			= $(64bit-emul)
-cflags-y		+= -mabi=lp64s
+cflags-y		+= -mabi=lp64s -mcmodel=normal
 endif
 
 cflags-y			+= -pipe $(CC_FLAGS_NO_FPU)
+cflags-y			+= -I$(srctree)/arch/loongarch/include/asm/mach
 LDFLAGS_vmlinux			+= -static -n -nostdlib
 
 # When the assembler supports explicit relocation hint, we must use it.
@@ -101,10 +102,14 @@ KBUILD_AFLAGS			+= $(call cc-option,-mthin-add-sub) $(call cc-option,-Wa$(comma)
 KBUILD_CFLAGS			+= $(call cc-option,-mthin-add-sub) $(call cc-option,-Wa$(comma)-mthin-add-sub)
 
 ifdef CONFIG_OBJTOOL
-KBUILD_CFLAGS			+= -fno-jump-tables
+ifdef CONFIG_CC_HAS_ANNOTATE_TABLEJUMP
+KBUILD_CFLAGS			+= $(call cc-option,-mannotate-tablejump)
+else
+KBUILD_CFLAGS			+= -fno-jump-tables # keep compatibility with older compilers
+endif
 endif
 
-KBUILD_RUSTFLAGS		+= --target=loongarch64-unknown-none-softfloat
+KBUILD_RUSTFLAGS		+= --target=loongarch64-unknown-none-softfloat -Ccode-model=small
 KBUILD_RUSTFLAGS_KERNEL		+= -Zdirect-access-external-data=yes
 KBUILD_RUSTFLAGS_MODULE		+= -Zdirect-access-external-data=no
 
@@ -114,6 +119,7 @@ KBUILD_RUSTFLAGS_KERNEL		+= -Crelocation-model=pie
 LDFLAGS_vmlinux			+= -static -pie --no-dynamic-linker -z notext $(call ld-option, --apply-dynamic-relocs)
 endif
 
+entry-y = $(shell LC_ALL=C readelf -e vmlinux | grep 'Entry point address:'|grep -o '0x[0-9a-f]\{16\}')
 cflags-y += $(call cc-option, -mno-check-zero-division)
 
 ifndef CONFIG_KASAN
@@ -121,7 +127,8 @@ cflags-y += -fno-builtin-memcpy -fno-builtin-memmove -fno-builtin-memset
 endif
 
 load-y		= 0x9000000000200000
-bootvars-y	= VMLINUX_LOAD_ADDRESS=$(load-y)
+bootvars-y	= VMLINUX_LOAD_ADDRESS=$(load-y) \
+		  VMLINUX_ENTRY_ADDRESS=$(entry-y)
 
 drivers-$(CONFIG_PCI)		+= arch/loongarch/pci/
 
@@ -173,7 +180,7 @@ all:	$(notdir $(KBUILD_IMAGE)) $(KBUILD_DTBS)
 
 vmlinuz.efi: vmlinux.efi
 
-vmlinux.elf vmlinux.efi vmlinuz.efi: vmlinux
+vmlinux.elf vmlinux.efi vmlinuz.efi uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(bootvars-y) $(boot)/$@
 
 install:

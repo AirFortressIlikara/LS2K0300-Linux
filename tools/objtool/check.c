@@ -22,6 +22,14 @@
 #include <linux/static_call_types.h>
 #include <linux/string.h>
 
+#ifndef EM_LOONGARCH
+#define EM_LOONGARCH		258
+#endif
+
+#ifndef R_LARCH_32_PCREL
+#define R_LARCH_32_PCREL	99
+#endif
+
 struct alternative {
 	struct alternative *next;
 	struct instruction *insn;
@@ -711,6 +719,18 @@ reachable:
 		}
 
 		insn->dead_end = false;
+
+		/* Handle the special cases compiled with Clang on LoongArch */
+		if (file->elf->ehdr.e_machine == EM_LOONGARCH &&
+		    reloc->sym->type == STT_SECTION) {
+			while (insn && insn_func(insn)) {
+				insn = prev_insn_same_sym(file, insn);
+				if (insn && insn->dead_end) {
+					insn->dead_end = false;
+					break;
+				}
+			}
+		}
 	}
 
 	return 0;
@@ -2079,6 +2099,9 @@ static int add_jump_table(struct objtool_file *file, struct instruction *insn,
 	unsigned int prev_offset = 0;
 	struct reloc *reloc = table;
 	struct alternative *alt;
+	unsigned long offset;
+	unsigned long rodata_entry_size;
+	unsigned long rodata_table_size = insn->table_size;
 
 	/*
 	 * Each @reloc is a switch table relocation which points to the target
@@ -2090,18 +2113,50 @@ static int add_jump_table(struct objtool_file *file, struct instruction *insn,
 		if (reloc != table && reloc == next_table)
 			break;
 
-		/* Make sure the table entries are consecutive: */
-		if (prev_offset && reloc_offset(reloc) != prev_offset + 8)
+		/* Handle the special cases compiled with Clang on LoongArch */
+		if (file->elf->ehdr.e_machine == EM_LOONGARCH &&
+		    reloc->sym->type == STT_SECTION && reloc != table &&
+		    reloc_offset(reloc) == reloc_offset(table) + rodata_table_size)
 			break;
+
+		/* Handle the special cases compiled with Clang on LoongArch */
+		if (file->elf->ehdr.e_machine == EM_LOONGARCH &&
+		    reloc_type(reloc) == R_LARCH_32_PCREL)
+			rodata_entry_size = 4;
+		else
+			rodata_entry_size = 8;
+
+		/* Make sure the table entries are consecutive: */
+		if (prev_offset && reloc_offset(reloc) != prev_offset + rodata_entry_size)
+			break;
+
+		if (reloc->sym->type == STT_SECTION) {
+			/* Addend field in the relocation entry associated with the symbol */
+			offset = reloc_addend(reloc);
+			/* Handle the special cases compiled with Clang on LoongArch */
+			if (file->elf->ehdr.e_machine == EM_LOONGARCH &&
+			    reloc_type(reloc) == R_LARCH_32_PCREL)
+				offset = reloc->sym->offset + reloc_addend(reloc) -
+					 (reloc_offset(reloc) - reloc_offset(table));
+		} else {
+			/* The address of the symbol in the relocation entry */
+			offset = reloc->sym->offset;
+		}
 
 		/* Detect function pointers from contiguous objects: */
-		if (reloc->sym->sec == pfunc->sec &&
-		    reloc_addend(reloc) == pfunc->offset)
+		if (reloc->sym->sec == pfunc->sec && offset == pfunc->offset)
 			break;
 
-		dest_insn = find_insn(file, reloc->sym->sec, reloc_addend(reloc));
+		dest_insn = find_insn(file, reloc->sym->sec, offset);
 		if (!dest_insn)
 			break;
+
+		/* Handle the special cases compiled with Clang on LoongArch */
+		if (file->elf->ehdr.e_machine == EM_LOONGARCH && reloc->sym->type == STT_SECTION &&
+		    (!insn_func(dest_insn) || insn_func(dest_insn)->pfunc != pfunc)) {
+			prev_offset = reloc_offset(reloc);
+			continue;
+		}
 
 		/* Make sure the destination is in the same function: */
 		if (!insn_func(dest_insn) || insn_func(dest_insn)->pfunc != pfunc)
@@ -2137,6 +2192,7 @@ static struct reloc *find_jump_table(struct objtool_file *file,
 {
 	struct reloc *table_reloc;
 	struct instruction *dest_insn, *orig_insn = insn;
+	unsigned long offset;
 
 	/*
 	 * Backward search using the @first_jump_src links, these help avoid
@@ -2160,7 +2216,16 @@ static struct reloc *find_jump_table(struct objtool_file *file,
 		table_reloc = arch_find_switch_table(file, insn);
 		if (!table_reloc)
 			continue;
-		dest_insn = find_insn(file, table_reloc->sym->sec, reloc_addend(table_reloc));
+
+		if (table_reloc->sym->type == STT_SECTION) {
+			/* Addend field in the relocation entry associated with the symbol */
+			offset = reloc_addend(table_reloc);
+		} else {
+			/* The address of the symbol in the relocation entry */
+			offset = table_reloc->sym->offset;
+		}
+
+		dest_insn = find_insn(file, table_reloc->sym->sec, offset);
 		if (!dest_insn || !insn_func(dest_insn) || insn_func(dest_insn)->pfunc != func)
 			continue;
 

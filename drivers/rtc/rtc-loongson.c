@@ -102,6 +102,11 @@ static const struct loongson_rtc_config ls2k1000_rtc_config = {
 	.flags = 0,
 };
 
+static const struct loongson_rtc_config ls2k_gen_rtc_config = {
+	.pm_offset = 0x0,
+	.flags = 0,
+};
+
 static const struct regmap_config loongson_rtc_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
@@ -114,6 +119,13 @@ static irqreturn_t loongson_rtc_isr(int irq, void *id)
 	struct loongson_rtc_priv *priv = (struct loongson_rtc_priv *)id;
 
 	rtc_update_irq(priv->rtcdev, 1, RTC_AF | RTC_IRQF);
+
+	/*
+	 * The TOY_MATCH0_REG should be cleared 0 here,
+	 * otherwise the interrupt cannot be cleared.
+	 */
+	regmap_write(priv->regmap, TOY_MATCH0_REG, 0);
+
 	return IRQ_HANDLED;
 }
 
@@ -131,11 +143,7 @@ static u32 loongson_rtc_handler(void *id)
 	writel(RTC_STS, priv->pm_base + PM1_STS_REG);
 	spin_unlock(&priv->lock);
 
-	/*
-	 * The TOY_MATCH0_REG should be cleared 0 here,
-	 * otherwise the interrupt cannot be cleared.
-	 */
-	return regmap_write(priv->regmap, TOY_MATCH0_REG, 0);
+	return ACPI_INTERRUPT_HANDLED;
 }
 
 static int loongson_rtc_set_enabled(struct device *dev)
@@ -320,8 +328,10 @@ static int loongson_rtc_probe(struct platform_device *pdev)
 				     "devm_rtc_allocate_device failed\n");
 
 	/* Get RTC alarm irq */
+	/* 发现 2k300 不需要中断 开了中断就会导致无法读写 */
+	/* 所以 pm_offset == 0 代表不需要中断 */
 	alarm_irq = platform_get_irq(pdev, 0);
-	if (alarm_irq > 0) {
+	if (alarm_irq > 0 && priv->config->pm_offset) {
 		ret = devm_request_irq(dev, alarm_irq, loongson_rtc_isr,
 				       0, "loongson-alarm", priv);
 		if (ret < 0)
@@ -369,6 +379,7 @@ static const struct of_device_id loongson_rtc_of_match[] = {
 	{ .compatible = "loongson,ls1c-rtc", .data = &ls1c_rtc_config },
 	{ .compatible = "loongson,ls7a-rtc", .data = &generic_rtc_config },
 	{ .compatible = "loongson,ls2k1000-rtc", .data = &ls2k1000_rtc_config },
+	{ .compatible = "loongson,ls2k-rtc", .data = &ls2k_gen_rtc_config },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, loongson_rtc_of_match);

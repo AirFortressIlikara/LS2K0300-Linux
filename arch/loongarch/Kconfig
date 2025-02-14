@@ -15,6 +15,7 @@ config LOONGARCH
 	select ARCH_ENABLE_THP_MIGRATION if TRANSPARENT_HUGEPAGE
 	select ARCH_HAS_ACPI_TABLE_UPGRADE	if ACPI
 	select ARCH_HAS_CPU_FINALIZE_INIT
+	select ARCH_HAS_CRC32
 	select ARCH_HAS_CURRENT_STACK_POINTER
 	select ARCH_HAS_DEBUG_VM_PGTABLE
 	select ARCH_HAS_FAST_MULTIPLIER
@@ -23,6 +24,7 @@ config LOONGARCH
 	select ARCH_HAS_KERNEL_FPU_SUPPORT if CPU_HAS_FPU
 	select ARCH_HAS_NMI_SAFE_THIS_CPU_OPS
 	select ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE
+	select ARCH_HAS_PREEMPT_LAZY
 	select ARCH_HAS_PTE_DEVMAP
 	select ARCH_HAS_PTE_SPECIAL
 	select ARCH_HAS_SET_MEMORY
@@ -66,6 +68,7 @@ config LOONGARCH
 	select ARCH_SUPPORTS_LTO_CLANG
 	select ARCH_SUPPORTS_LTO_CLANG_THIN
 	select ARCH_SUPPORTS_NUMA_BALANCING
+	select ARCH_SUPPORTS_RT
 	select ARCH_USE_BUILTIN_BSWAP
 	select ARCH_USE_CMPXCHG_LOCKREF
 	select ARCH_USE_QUEUED_RWLOCKS
@@ -155,6 +158,7 @@ config LOONGARCH
 	select HAVE_PERF_EVENTS
 	select HAVE_PERF_REGS
 	select HAVE_PERF_USER_STACK_DUMP
+	select HAVE_POSIX_CPU_TIMERS_TASK_WORK
 	select HAVE_PREEMPT_DYNAMIC_KEY
 	select HAVE_REGS_AND_STACK_ACCESS_API
 	select HAVE_RELIABLE_STACKTRACE if UNWINDER_ORC
@@ -242,7 +246,7 @@ config MACH_LOONGSON64
 	def_bool 64BIT
 
 config FIX_EARLYCON_MEM
-	def_bool y
+	def_bool !ARCH_IOREMAP
 
 config PGTABLE_2LEVEL
 	bool
@@ -283,6 +287,141 @@ config AS_HAS_LBT_EXTENSION
 
 config AS_HAS_LVZ_EXTENSION
 	def_bool $(as-instr,hvcl 0)
+
+config CC_HAS_ANNOTATE_TABLEJUMP
+	def_bool $(cc-option,-mannotate-tablejump)
+
+if LOONGARCH
+
+choice
+	prompt "Machine Type"
+	default LOONGSON64_GENERIC
+
+config LOONGSON64_GENERIC
+	bool "Generic Loongson 64-bit family machines"
+	select ARCH_SPARSEMEM_ENABLE
+	select ARCH_MIGHT_HAVE_PC_PARPORT
+	select ARCH_MIGHT_HAVE_PC_SERIO
+	select BOOT_ELF32
+	select BOARD_SCACHE
+	select CPU_HAS_WB
+	select HW_HAS_PCI
+	select ISA
+	select HT_PCI
+	select IRQ_LOONGARCH_CPU
+	select NR_CPUS_DEFAULT_4
+	select SPARSE_IRQ
+	select SYS_HAS_CPU_LOONGSON64
+	select SYS_SUPPORTS_SMP
+	select SYS_SUPPORTS_HOTPLUG_CPU
+	select SYS_SUPPORTS_NUMA
+	select SYS_SUPPORTS_64BIT_KERNEL
+	select SYS_SUPPORTS_HIGHMEM
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select ZONE_DMA32
+	select USE_OF
+	help
+	  Generic Loongson 64-bit family machines utilize the Loongson-3A/3B/3C
+	  revision of Loongson processor and LS7A chipset.
+
+config LOONGSON_2K500
+	bool "Loongson 2K500 family SoC"
+	select ARCH_SPARSEMEM_ENABLE
+	select ARCH_MIGHT_HAVE_PC_PARPORT
+	select BOOT_ELF32
+	select BOARD_SCACHE
+	select CPU_HAS_WB
+	select HW_HAS_PCI
+	select ISA
+	select HT_PCI
+	select IRQ_LOONGARCH_CPU
+	select NR_CPUS_DEFAULT_4
+	select SPARSE_IRQ
+	select SYS_HAS_CPU_LOONGSON64
+	select SYS_SUPPORTS_HOTPLUG_CPU
+	select SYS_SUPPORTS_64BIT_KERNEL
+	select SYS_SUPPORTS_HIGHMEM
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select ZONE_DMA32
+	select USE_OF
+	select COMMON_CLK
+	help
+	  Loongson 2K500 family SoC.
+
+config LOONGSON_2K300
+	bool "Loongson 2K300 family SoC"
+	select ARCH_SPARSEMEM_ENABLE
+	select ARCH_MIGHT_HAVE_PC_PARPORT
+	select BOOT_ELF32
+	select BOARD_SCACHE
+	select CPU_HAS_WB
+	select ISA
+	select IRQ_LOONGARCH_CPU
+	select NR_CPUS_DEFAULT_4
+	select SPARSE_IRQ
+	select SYS_HAS_CPU_LOONGSON64
+	select SYS_SUPPORTS_HOTPLUG_CPU
+	select SYS_SUPPORTS_64BIT_KERNEL
+	select SYS_SUPPORTS_HIGHMEM
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select ZONE_DMA32
+	select USE_OF
+	select COMMON_CLK
+	help
+	  Loongson 2K300 family SoC.
+
+config LOONGSON_2P500
+	bool "Loongson 2P500 family SoC"
+	select ARCH_SPARSEMEM_ENABLE
+	select ARCH_MIGHT_HAVE_PC_PARPORT
+	select BOOT_ELF32
+	select BOARD_SCACHE
+	select CPU_HAS_WB
+	select HW_HAS_PCI
+	select ISA
+	select HT_PCI
+	select IRQ_LOONGARCH_CPU
+	select NR_CPUS_DEFAULT_4
+	select SPARSE_IRQ
+	select SYS_HAS_CPU_LOONGSON64
+	select SYS_SUPPORTS_HOTPLUG_CPU
+	select SYS_SUPPORTS_64BIT_KERNEL
+	select SYS_SUPPORTS_HIGHMEM
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select ZONE_DMA32
+	select USE_OF
+	select COMMON_CLK
+	help
+	  Loongson 2P500 family SoC.
+
+config LOONGSON_2K1000
+	bool "Loongson 2K1000 family SoC"
+	select ARCH_SPARSEMEM_ENABLE
+	select ARCH_MIGHT_HAVE_PC_PARPORT
+	select BOOT_ELF32
+	select BOARD_SCACHE
+	select CPU_HAS_WB
+	select HW_HAS_PCI
+	select ISA
+	select HT_PCI
+	select IRQ_LOONGARCH_CPU
+	select NR_CPUS_DEFAULT_4
+	select SPARSE_IRQ
+	select SYS_HAS_CPU_LOONGSON64
+	select SYS_SUPPORTS_SMP
+	select SYS_SUPPORTS_HOTPLUG_CPU
+	select SYS_SUPPORTS_NUMA
+	select SYS_SUPPORTS_64BIT_KERNEL
+	select SYS_SUPPORTS_HIGHMEM
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select ZONE_DMA32
+	select USE_OF
+	select COMMON_CLK
+	help
+	  Loongson 2K1000 family SoC.
+endchoice
+
+endif # LOONGARCH Machine Type
 
 menu "Kernel type and options"
 
@@ -400,9 +539,20 @@ config BUILTIN_DTB
 
 	  Built-in DTBs are generic enough and can be used as references.
 
+config DTB_MATCH_BY_BOARD_NAME
+	bool "dtb match by board_name which from command line"
+	depends on BUILTIN_DTB
+	default y
+	help
+	  Base name (without suffix, relative to arch/loongarch/boot/dts/)
+	  for the DTS file that will be used to produce the DTB linked into
+	  the kernel.
+	  support match dtb by board_name which from command line
+	  so that bootloader given this value in command line
+
 config BUILTIN_DTB_NAME
 	string "Source file for built-in dtb"
-	depends on BUILTIN_DTB
+	depends on BUILTIN_DTB && !DTB_MATCH_BY_BOARD_NAME
 	help
 	  Base name (without suffix, relative to arch/loongarch/boot/dts/)
 	  for the DTS file that will be used to produce the DTB linked into
