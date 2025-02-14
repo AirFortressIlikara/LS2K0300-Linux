@@ -288,7 +288,7 @@ config PINCTRL_LOONGSON2
 	 pinctrl for Loongson-2 SoC.
 
 config PINCTRL_LS2K300
-	bool "Pinctrl driver for the Microsemi Ocelot SoCs"
+	bool "Pinctrl driver for the LS2K0300 SoC"
 	default y
 	depends on OF
 	select GPIOLIB

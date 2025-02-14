@@ -16,3 +16,11 @@ config SPI_NXP_SPIFI
 	  SPIFI is a specialized controller for connecting serial SPI
 	  Flash. Enable this option if you have a device with a SPIFI
 	  controller and want to access the Flash as a mtd device.
+
+config SPI_LS_QUADSPI
+	tristate "LOONGSON Quad SPI controller"
+	depends on LOONGARCH || COMPILE_TEST
+	depends on HAS_IOMEM
+	help
+	  This enables support for the loongson Quad SPI controller.
+	  We only connect the NOR to this controller.
