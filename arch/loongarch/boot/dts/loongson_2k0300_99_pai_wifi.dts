@@ -208,7 +208,7 @@
 };
 
 &spi2 {
-	status = "okay";
+	status = "disabled";
 	pinctrl-0 = <&spi2_pin>;
 	spidev@0{
 		compatible = "rohm,dh2228fv";
@@ -217,16 +217,40 @@
 	};
 };
 
+&pwm_atim {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&atim3_pin_m1>, <&atim3n_pin_m1>;
+};
+
+&pwm_gtim {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&gtim2_pin_m1>, <&gtim3_pin_m1>;
+};
+
+&pwm0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm0_mux_m0>;
+};
+
+&pwm1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm1_mux_m0>;
+};
+
 &pwm2 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pwm2_mux_m1>;
+	pinctrl-0 = <&pwm2_mux_m0>;
 };
 
-&pwm3{
+&pwm3 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pwm3_mux_m1>;
+	pinctrl-0 = <&pwm3_mux_m0>;
 };
 
 &dc{

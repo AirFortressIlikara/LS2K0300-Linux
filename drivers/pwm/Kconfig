@@ -712,6 +712,22 @@ config PWM_LS2K300
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-ls.
 
+config PWM_LS2K300_GTIM
+	tristate "Loongson GTIM PWM support"
+	help
+	  GTIM PWM framework driver for loongson2k.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-ls-gtim.
+
+config PWM_LS2K300_ATIM
+	tristate "Loongson ATIM PWM support"
+	help
+	  ATIM PWM framework driver for loongson2k.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-ls-atim.
+
 config PWM_XILINX
 	tristate "Xilinx AXI Timer PWM support"
 	depends on OF_ADDRESS

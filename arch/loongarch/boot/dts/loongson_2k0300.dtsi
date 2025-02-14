@@ -543,6 +543,24 @@
 			ls,bus_num = <1>;
 		};
 
+        pwm_atim: pwm@16118000{
+            compatible = "loongson,ls2k-pwm-atim";
+            reg = <0 0x16118000 0 0x1000>;
+            clock-frequency = <100000000>;
+            #pwm-cells = <2>;
+            
+            status = "disabled";
+        };
+        
+        pwm_gtim: pwm@16119000{
+            compatible = "loongson,ls2k-pwm-gtim";
+            reg = <0 0x16119000 0 0x1000>;
+            clock-frequency = <100000000>;
+            #pwm-cells = <2>;
+            
+            status = "disabled";
+        };
+
 		pwm0: pwm@0x1611b000 {
 			status = "disable";
 			compatible = "loongson,ls2k-pwm";
