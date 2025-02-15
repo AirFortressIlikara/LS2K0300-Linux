@@ -128,6 +128,10 @@
 		pinctrl-single,register-width = <32>;
 		pinctrl-single,function-mask = <0x3>;
 
+		uart0_pins: pinmux_G40_G41_as_uart0 {
+			pinctrl-single,bits = <0x8 0x000f0000 0x000f0000>;
+		};
+
 		uart1_pins: pinmux_G42_G43_as_uart1 {
 			pinctrl-single,bits = <0x8 0x00f00000 0x00f00000>;
 		};
@@ -186,6 +190,11 @@
 
 		i2c3_pins: pinmux_G54_G55_as_i2c3 {
 			pinctrl-single,bits = <0xc 0x0000f000 0x0000f000>;
+		};
+
+		spi0_pins: pinmux_G60_G63_as_spi1 {
+			pinctrl-single,bits = <0xc 0x00ff0000 0x00ff0000
+						0x10 0x00001400 0x00003c00>;
 		};
 
 		spi1_pins: pinmux_G60_G63_as_spi1 {

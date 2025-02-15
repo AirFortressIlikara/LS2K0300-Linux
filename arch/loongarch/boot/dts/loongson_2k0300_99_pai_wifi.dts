@@ -1,0 +1,150 @@
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pwm/pwm.h>
+#include <dt-bindings/input/linux-event-codes.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+#include "loongson2k300.dtsi"
+#include "loongson_panel_param.dtsi"
+
+/ {
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "earlycon";
+	};
+
+	/* not need memory node, we get memory info from boot params. */
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&gmac0 {
+	status = "okay";
+	phy-handle = <&yt8511h0>;
+	mdio {
+		compatible = "snps,dwmac-mdio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		yt8511h0: ethernet-phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <0>;
+			motorcomm,led0_cfg = <0x40>; //千兆常亮
+			motorcomm,led1_cfg = <0x30>; //百兆 十兆常亮
+			motorcomm,led2_cfg = <0x2600>; //有数据时闪烁
+		};
+	};
+};
+
+&i2c0 {
+	status = "okay";
+
+	codec: @10 {
+		compatible = "everest,es8323";
+		reg = <0x10>;
+	};
+
+	touchpad: gt9147@14 {
+		status = "disabled";
+		compatible = "goodix,gt9147";
+		reg = <0x14>;
+		// 2K300 GPIO 支持中断控制
+		// GPIO 中断号为 vhwirq-base + pinnum (180 = 128 + 52)
+		interrupt-parent = <&gpio>;
+		interrupts = <180 IRQ_TYPE_EDGE_FALLING>;
+		irq-gpios = <&gpio 52 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio 53 GPIO_ACTIVE_LOW>;
+
+		goodix,type-a-report = <0>;
+		goodix,driver-send-cfg = <0>;
+		goodix,create-wr-node = <1>;
+		goodix,wakeup-with-reset = <0>;
+		goodix,resume-in-workqueue = <0>;
+		goodix,int-sync = <1>;
+		goodix,swap-x2y = <0>;
+		goodix,esd-protect = <0>;
+		goodix,auto-update = <1>;
+		goodix,auto-update-cfg = <0>;
+		goodix,power-off-sleep = <0>;
+		goodix.pen-suppress-finger = <0>;
+		goodix,cfg-group0 = [
+			53 D0 02 00 05 05 F5 D5 21 48 2D 0F 5A 41 0E 05 00 00 32
+			32 20 00 05 14 14 1A 14 8B 2B 00
+		];
+	};
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "disabled";
+};
+
+&i2s {
+	status = "okay";
+};
+
+&audio {
+	status = "okay";
+};
+
+&spi0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_pins>;
+
+	spi-flash@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <25000000>;
+		reg = <0>;
+	};
+};
+
+&spi1 {
+	status = "okay";
+};
+
+&spi2 {
+	status = "disabled";
+};
+
+&can2 {
+	status = "disabled";
+};
+
+&can3 {
+	status = "disabled";
+};
+
+&adc {
+	status = "okay";
+};
+
+&rtc0 {
+	status = "okay";
+};
+
+&sdio1 {
+	pinctrl-0 = <&sdio1_pins>;
+	pinctrl-names = "default";
+	cap-sd-highspeed;
+	cap-mmc-highspeed;
+	bus-width = <4>;
+	cd-gpios = <&gpio 82 GPIO_ACTIVE_LOW>;
+	status = "okay";
+};
+
+&dc {
+	status = "disabled";
+}
