@@ -1,27 +1,25 @@
 /*
  * @Author: ilikara 3435193369@qq.com
  * @Date: 2024-12-02 07:23:11
- * @LastEditors: Ilikara 3435193369@qq.com
- * @LastEditTime: 2025-02-12 17:56:51
+ * @LastEditors: ilikara 3435193369@qq.com
+ * @LastEditTime: 2025-02-16 02:57:32
  * @FilePath: /LS2K0300-Linux/drivers/pwm/pwm-ls-gtim.c
  * @Description: 
  * 
  * Copyright (c) 2025 by ilikara 3435193369@qq.com, All Rights Reserved. 
  */
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/clocksource.h>
-#include <linux/clockchips.h>
 
+#include <linux/acpi.h>
 #include <linux/clk.h>
-#include <linux/err.h>
-#include <linux/ioport.h>
+#include <linux/device.h>
+#include <linux/init.h>
 #include <linux/io.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
-#include <linux/of_device.h>
-#include <linux/slab.h>
+#include <linux/units.h>
+#include <linux/delay.h>
 
 /* counter offest */
 #define GTIM_CR1 0x00
@@ -55,161 +53,150 @@
 #define CCER_CCnE(n) BIT((n) * 4 + 0)
 #define CCER_CCnP(n) BIT((n) * 4 + 1)
 
-#define to_ls_pwm_gtim_chip(_chip) \
-	container_of(_chip, struct ls_pwm_gtim_chip, chip)
-#define NS_IN_HZ (1000000000UL)
-#define CPU_FRQ_PWM (50000000UL)
+/* default input clk frequency for the ACPI case */
+#define LOONGSON_PWM_FREQ_DEFAULT 50000000 /* Hz */
 
-struct ls_pwm_gtim_chip {
-	struct pwm_chip chip;
-	void __iomem *mmio_base;
-	/* following registers used for suspend/resume */
+struct pwm_loongson_suspend_store {
 	u32 arr_reg;
 	u32 ccr_reg[4];
 	u32 ccer_reg;
 	u32 en_mark;
-	u64 clock_frequency;
 };
+
+struct pwm_loongson_ddata {
+	struct clk *clk;
+	void __iomem *base;
+	u64 clk_rate;
+	struct pwm_loongson_suspend_store lss;
+};
+
+static inline struct pwm_loongson_ddata *
+to_pwm_loongson_ddata(struct pwm_chip *chip)
+{
+	return pwmchip_get_drvdata(chip);
+}
+
+static inline u32 pwm_loongson_readl(struct pwm_loongson_ddata *ddata,
+				     u32 offset)
+{
+	return readl(ddata->base + offset);
+}
+
+static inline void pwm_loongson_writel(struct pwm_loongson_ddata *ddata,
+				       u32 val, u32 offset)
+{
+	writel(val, ddata->base + offset);
+}
 
 static int ls_pwm_gtim_set_polarity(struct pwm_chip *chip,
 				    struct pwm_device *pwm,
 				    enum pwm_polarity polarity)
 {
-	struct ls_pwm_gtim_chip *ls_pwm = to_ls_pwm_gtim_chip(chip);
 	u16 val;
+	struct pwm_loongson_ddata *ddata = to_pwm_loongson_ddata(chip);
 
-	val = readl(ls_pwm->mmio_base + GTIM_CCER);
-	switch (polarity) {
-	case PWM_POLARITY_NORMAL:
+	val = pwm_loongson_readl(ddata, GTIM_CCER);
+
+	if (polarity == PWM_POLARITY_INVERSED)
+		/* Duty cycle defines LOW period of PWM */
 		val &= ~CCER_CCnP(pwm->hwpwm);
-		break;
-	case PWM_POLARITY_INVERSED:
+	else
+		/* Duty cycle defines HIGH period of PWM */
 		val |= CCER_CCnP(pwm->hwpwm);
-		break;
-	default:
-		break;
-	}
-	writel(val, ls_pwm->mmio_base + GTIM_CCER);
+
+	pwm_loongson_writel(ddata, val, GTIM_CCER);
+
 	return 0;
 }
 
 static void ls_pwm_gtim_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 {
-	struct ls_pwm_gtim_chip *ls_pwm = to_ls_pwm_gtim_chip(chip);
-	u32 cr1_reg, ccmr_reg;
+	struct pwm_loongson_ddata *ddata = to_pwm_loongson_ddata(chip);
+	u32 val;
 
 	if (pwm->state.polarity == PWM_POLARITY_NORMAL)
-		writel(ls_pwm->arr_reg,
-		       ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
+		pwm_loongson_writel(ddata, ddata->lss.arr_reg,
+				    GTIM_CCR(pwm->hwpwm));
 	else if (pwm->state.polarity == PWM_POLARITY_INVERSED)
-		writel(0, ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
+		pwm_loongson_writel(ddata, 0, GTIM_CCR(pwm->hwpwm));
 
-	ccmr_reg = readl(ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-	ccmr_reg &= ~(0b111 * CCMR_OCnM(pwm->hwpwm));
-	writel(ccmr_reg, ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
+	val = pwm_loongson_readl(ddata, GTIM_CCMR(pwm->hwpwm));
+	val &= ~(0b111 * CCMR_OCnM(pwm->hwpwm));
+	pwm_loongson_writel(ddata, val, GTIM_CCMR(pwm->hwpwm));
 
-	ls_pwm->en_mark &= ~BIT(pwm->hwpwm);
-	if (ls_pwm->en_mark == 0b0000) {
-		cr1_reg = readl(ls_pwm->mmio_base + GTIM_CR1);
-		cr1_reg &= ~CR1_CEN;
-		writel(cr1_reg, ls_pwm->mmio_base + GTIM_CR1);
-		writel(0x0, ls_pwm->mmio_base + GTIM_CNT);
+	ddata->lss.en_mark &= ~BIT(pwm->hwpwm);
+	if (ddata->lss.en_mark == 0b0000) {
+		val = pwm_loongson_readl(ddata, GTIM_CR1);
+		val &= ~CR1_CEN;
+		pwm_loongson_writel(ddata, val, GTIM_CR1);
+		pwm_loongson_writel(ddata, 0x0, GTIM_CNT);
 	}
 }
 
 static int ls_pwm_gtim_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 {
-	struct ls_pwm_gtim_chip *ls_pwm = to_ls_pwm_gtim_chip(chip);
-	int ret;
-	u32 cr1_reg, ccmr_reg;
+	u32 val;
+	struct pwm_loongson_ddata *ddata = to_pwm_loongson_ddata(chip);
 
-	writel(ls_pwm->ccr_reg[pwm->hwpwm],
-	       ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
-	writel(ls_pwm->arr_reg, ls_pwm->mmio_base + GTIM_ARR);
+	pwm_loongson_writel(ddata, ddata->lss.ccr_reg[pwm->hwpwm % 4],
+			    GTIM_CCR(pwm->hwpwm));
+	pwm_loongson_writel(ddata, ddata->lss.arr_reg, GTIM_ARR);
 
 	// todo:类似config函数中的特殊处理
-	ccmr_reg = readl(ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-	ccmr_reg |= 0b111 * CCMR_OCnM(pwm->hwpwm);
-	writel(ccmr_reg, ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
+	val = pwm_loongson_readl(ddata, GTIM_CCMR(pwm->hwpwm));
+	val |= 0b111 * CCMR_OCnM(pwm->hwpwm);
+	pwm_loongson_writel(ddata, val, GTIM_CCMR(pwm->hwpwm));
 
-	ret = readl(ls_pwm->mmio_base + GTIM_CCER);
-	ret |= CCER_CCnE(pwm->hwpwm);
-	writel(ret, ls_pwm->mmio_base + GTIM_CCER);
+	val = pwm_loongson_readl(ddata, GTIM_CCER);
+	val |= CCER_CCnE(pwm->hwpwm);
+	pwm_loongson_writel(ddata, val, GTIM_CCER);
 
-	if (ls_pwm->en_mark == 0b0000) {
-		writel(0x0, ls_pwm->mmio_base + GTIM_CNT);
-		cr1_reg = readl(ls_pwm->mmio_base + GTIM_CR1);
-		cr1_reg |= CR1_CEN;
-		writel(cr1_reg, ls_pwm->mmio_base + GTIM_CR1);
+	if (ddata->lss.en_mark == 0b0000) {
+		pwm_loongson_writel(ddata, 0x0, GTIM_CNT);
+		val = pwm_loongson_readl(ddata, GTIM_CR1);
+		val |= CR1_CEN;
+		pwm_loongson_writel(ddata, val, GTIM_CR1);
 	}
-	ls_pwm->en_mark |= BIT(pwm->hwpwm);
+	ddata->lss.en_mark |= BIT(pwm->hwpwm);
 	return 0;
 }
 
 static int ls_pwm_gtim_config(struct pwm_chip *chip, struct pwm_device *pwm,
 			      int duty_ns, int period_ns)
 {
-	struct ls_pwm_gtim_chip *ls_pwm = to_ls_pwm_gtim_chip(chip);
-	unsigned int arr_reg, ccr_reg;
-	unsigned long long val0, val1;
-	u32 ccmr_reg;
+	u32 duty, period;
+	struct pwm_loongson_ddata *ddata = to_pwm_loongson_ddata(chip);
 
-	if (period_ns > NS_IN_HZ || duty_ns > NS_IN_HZ)
-		return -ERANGE;
+	/* duty = duty_ns * ddata->clk_rate / NSEC_PER_SEC */
+	duty = mul_u64_u64_div_u64(duty_ns, ddata->clk_rate, NSEC_PER_SEC);
+	pwm_loongson_writel(ddata, duty, GTIM_CCR(pwm->hwpwm));
 
-	/*
-	 * arr_reg = period_ns/(NSEC_PER_SEC/ls_pwm->clock_frequency);
-	 * arr_reg = period_ns * ls_pwm->clock_frequency / NSEC_PER_SEC;
-	 */
+	/* period = period_ns * ddata->clk_rate / NSEC_PER_SEC */
+	period = mul_u64_u64_div_u64(period_ns, ddata->clk_rate, NSEC_PER_SEC);
+	pwm_loongson_writel(ddata, period, GTIM_ARR);
 
-	if (duty_ns == 0) {
-		ccmr_reg = readl(ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-		ccmr_reg &= ~(0b111 * CCMR_OCnM(pwm->hwpwm));
-		ccmr_reg |= 0b101 * CCMR_OCnM(pwm->hwpwm);
-		writel(ccmr_reg, ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-	} else if (period_ns == duty_ns) {
-		ccmr_reg = readl(ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-		ccmr_reg &= ~(0b111 * CCMR_OCnM(pwm->hwpwm));
-		ccmr_reg |= 0b100 * CCMR_OCnM(pwm->hwpwm);
-		writel(ccmr_reg, ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-	} else {
-		ccmr_reg = readl(ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-		ccmr_reg |= 0b111 * CCMR_OCnM(pwm->hwpwm);
-		writel(ccmr_reg, ls_pwm->mmio_base + GTIM_CCMR(pwm->hwpwm));
-	}
-
-	val0 = ls_pwm->clock_frequency * period_ns;
-	do_div(val0, NSEC_PER_SEC);
-	arr_reg = val0 < 1 ? 1 : val0;
-
-	val1 = ls_pwm->clock_frequency * duty_ns;
-	do_div(val1, NSEC_PER_SEC);
-	ccr_reg = val1 < 1 ? 1 : val1;
-
-	writel(ccr_reg, ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
-	writel(arr_reg, ls_pwm->mmio_base + GTIM_ARR);
-	writel(0x0, ls_pwm->mmio_base + GTIM_CNT);
-
-	ls_pwm->arr_reg = arr_reg;
-	ls_pwm->ccr_reg[pwm->hwpwm] = ccr_reg;
 	return 0;
 }
 
 static int ls_pwm_gtim_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 			     const struct pwm_state *state)
 {
-	bool enabled;
 	int ret;
+	u64 period, duty_cycle;
+	bool enabled = pwm->state.enabled;
 
-	enabled = pwm->state.enabled;
-
-	if (enabled && !state->enabled) {
-		ls_pwm_gtim_disable(chip, pwm);
+	if (!state->enabled) {
+		if (enabled)
+			ls_pwm_gtim_disable(chip, pwm);
 		return 0;
 	}
 
-	if (state->polarity != pwm->state.polarity)
-		ls_pwm_gtim_set_polarity(chip, pwm, state->polarity);
+	ret = ls_pwm_gtim_set_polarity(chip, pwm, state->polarity);
+	if (ret)
+		return ret;
+
+	period = min(state->period, NSEC_PER_SEC);
+	duty_cycle = min(state->duty_cycle, NSEC_PER_SEC);
 
 	ret = ls_pwm_gtim_config(chip, pwm, state->duty_cycle, state->period);
 	if (ret)
@@ -221,48 +208,25 @@ static int ls_pwm_gtim_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	return ret;
 }
 
-static unsigned int ls_pwm_gtim_reg_to_ns(struct ls_pwm_gtim_chip *ls_pwm,
-					  unsigned int reg)
-{
-	unsigned long long val;
-
-	val = reg * NSEC_PER_SEC;
-	do_div(val, ls_pwm->clock_frequency);
-	return val;
-}
-
 static int ls_pwm_gtim_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
 				 struct pwm_state *state)
 {
-	struct ls_pwm_gtim_chip *ls_pwm = to_ls_pwm_gtim_chip(chip);
-	unsigned int arr_reg, ccr_reg;
-	u32 ccer_reg;
+	u32 arr_reg, ccr_reg, ccer_reg;
+	struct pwm_loongson_ddata *ddata = to_pwm_loongson_ddata(chip);
 
-	/*
-	 * period_ns = arr_reg *NSEC_PER_SEC /ls_pwm->clock_frequency.
-	 */
-	arr_reg = readl(ls_pwm->mmio_base + GTIM_ARR);
-	state->period = ls_pwm_gtim_reg_to_ns(ls_pwm, arr_reg);
+	arr_reg = pwm_loongson_readl(ddata, GTIM_ARR);
+	ccr_reg = pwm_loongson_readl(ddata, GTIM_CCR(pwm->hwpwm));
+	ccer_reg = pwm_loongson_readl(ddata, GTIM_CCER);
 
-	ccr_reg = readl(ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
-	state->duty_cycle = ls_pwm_gtim_reg_to_ns(ls_pwm, ccr_reg);
-
-	ccer_reg = readl(ls_pwm->mmio_base + GTIM_CCER);
+	/* duty & period have a max of 2^32, so we can't overflow */
+	state->duty_cycle = DIV64_U64_ROUND_UP((u64)ccr_reg * NSEC_PER_SEC,
+					       ddata->clk_rate);
+	state->period = DIV64_U64_ROUND_UP((u64)arr_reg * NSEC_PER_SEC,
+					   ddata->clk_rate);
 	state->polarity = (ccer_reg & CCER_CCnP(pwm->hwpwm)) ?
 				  PWM_POLARITY_INVERSED :
 				  PWM_POLARITY_NORMAL;
 	state->enabled = (ccer_reg & CCER_CCnE(pwm->hwpwm)) ? true : false;
-
-	if (state->enabled) {
-		ls_pwm->en_mark |= BIT(pwm->hwpwm);
-	} else {
-		ls_pwm->en_mark &= ~BIT(pwm->hwpwm);
-	}
-
-	ls_pwm->ccer_reg = ccer_reg;
-	ls_pwm->ccr_reg[pwm->hwpwm] =
-		readl(ls_pwm->mmio_base + GTIM_CCR(pwm->hwpwm));
-	ls_pwm->arr_reg = readl(ls_pwm->mmio_base + GTIM_ARR);
 
 	return 0;
 }
@@ -274,122 +238,116 @@ static const struct pwm_ops ls_pwm_gtim_ops = {
 
 static int ls_pwm_gtim_probe(struct platform_device *pdev)
 {
-	struct ls_pwm_gtim_chip *pwm;
-	struct resource *mem;
-	int err;
-	struct device_node *np = pdev->dev.of_node;
-	u32 clk;
+	int ret;
+	struct pwm_chip *chip;
+	struct pwm_loongson_ddata *ddata;
+	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
+	u32 of_clk_freq = 0;
 
-	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-	if (!pwm) {
-		dev_err(&pdev->dev, "failed to allocate memory\n");
-		return -ENOMEM;
-	}
+	chip = devm_pwmchip_alloc(dev, 1, sizeof(*ddata));
+	if (IS_ERR(chip))
+		return PTR_ERR(chip);
+	ddata = to_pwm_loongson_ddata(chip);
 
-	pwm->en_mark = 0b0000;
+	ddata->lss.en_mark = 0b00000000;
 
-	pwm->chip.dev = &pdev->dev;
-	pwm->chip.ops = &ls_pwm_gtim_ops;
-	pwm->chip.npwm = 4;
+	ddata->base = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(ddata->base))
+		return PTR_ERR(ddata->base);
 
-	if (!(of_property_read_u32(np, "clock-frequency", &clk)))
-		pwm->clock_frequency = clk;
-	else
-		pwm->clock_frequency = CPU_FRQ_PWM;
+	ddata->clk = devm_clk_get_optional_enabled(dev, NULL);
+	if (IS_ERR(ddata->clk))
+		return dev_err_probe(dev, PTR_ERR(ddata->clk),
+				     "failed to get pwm clock\n");
+	ddata->clk_rate = LOONGSON_PWM_FREQ_DEFAULT;
+	if (ddata->clk) {
+		ret = devm_clk_rate_exclusive_get(dev, ddata->clk);
+		if (ret)
+			return ret;
 
-	dev_info(&pdev->dev, "pwm->clock_frequency=%llu", pwm->clock_frequency);
-
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!mem) {
-		dev_err(&pdev->dev, "no mem resource?\n");
-		return -ENODEV;
-	}
-	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, mem);
-	if (!pwm->mmio_base) {
-		dev_err(&pdev->dev, "mmio_base is null\n");
-		return -ENOMEM;
-	}
-
-	err = pwmchip_add(&pwm->chip);
-	if (err < 0) {
-		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", err);
-		return err;
-	}
-
-	writel(EGR_UG, pwm->mmio_base + GTIM_EGR);
-
-	platform_set_drvdata(pdev, pwm);
-	dev_dbg(&pdev->dev, "pwm probe successful\n");
-	return 0;
-}
-
-static int ls_pwm_gtim_remove(struct platform_device *pdev)
-{
-	struct ls_pwm_gtim_chip *pwm = platform_get_drvdata(pdev);
-
-	if (!pwm)
-		return -ENODEV;
-
-	pwmchip_remove(&pwm->chip);
-
-	return 0;
-}
-
+		ddata->clk_rate = clk_get_rate(ddata->clk);
+	} else {
 #ifdef CONFIG_OF
-static struct of_device_id ls_pwm_gtim_id_table[] = {
-	{ .compatible = "loongson,ls2k-pwm-gtim" },
-	{},
-};
-MODULE_DEVICE_TABLE(of, ls_pwm_gtim_id_table);
+		if (!of_property_read_u32(np, "clock-frequency", &of_clk_freq))
+			ddata->clk_rate = of_clk_freq;
 #endif
+	}
 
-#ifdef CONFIG_PM_SLEEP
+	/* Explicitly initialize the CCER register */
+	pwm_loongson_writel(ddata, 0, GTIM_CCER);
+
+	/* Additional configuration for GTIM */
+	pwm_loongson_writel(ddata, EGR_UG, GTIM_EGR);
+
+	chip->ops = &ls_pwm_gtim_ops;
+	chip->npwm = 8;
+	chip->atomic = true;
+	dev_set_drvdata(dev, chip);
+
+	ret = devm_pwmchip_add(dev, chip);
+	if (ret < 0)
+		return dev_err_probe(dev, ret, "failed to add PWM chip\n");
+
+	return 0;
+}
+
 static int ls_pwm_gtim_suspend(struct device *dev)
 {
-	struct ls_pwm_gtim_chip *ls_pwm = dev_get_drvdata(dev);
+	struct pwm_chip *chip = dev_get_drvdata(dev);
+	struct pwm_loongson_ddata *ddata = to_pwm_loongson_ddata(chip);
 
-	ls_pwm->ccer_reg = readl(ls_pwm->mmio_base + GTIM_CCER);
-	ls_pwm->ccr_reg[0] = readl(ls_pwm->mmio_base + GTIM_CCR(0));
-	ls_pwm->ccr_reg[1] = readl(ls_pwm->mmio_base + GTIM_CCR(1));
-	ls_pwm->ccr_reg[2] = readl(ls_pwm->mmio_base + GTIM_CCR(2));
-	ls_pwm->ccr_reg[3] = readl(ls_pwm->mmio_base + GTIM_CCR(3));
-	ls_pwm->arr_reg = readl(ls_pwm->mmio_base + GTIM_ARR);
+	ddata->lss.ccer_reg = pwm_loongson_readl(ddata, GTIM_CCER);
+	ddata->lss.ccr_reg[0] = pwm_loongson_readl(ddata, GTIM_CCR(0));
+	ddata->lss.ccr_reg[1] = pwm_loongson_readl(ddata, GTIM_CCR(1));
+	ddata->lss.ccr_reg[2] = pwm_loongson_readl(ddata, GTIM_CCR(2));
+	ddata->lss.ccr_reg[3] = pwm_loongson_readl(ddata, GTIM_CCR(3));
+	ddata->lss.arr_reg = pwm_loongson_readl(ddata, GTIM_ARR);
+
+	clk_disable_unprepare(ddata->clk);
+
 	return 0;
 }
 
 static int ls_pwm_gtim_resume(struct device *dev)
 {
-	struct ls_pwm_gtim_chip *ls_pwm = dev_get_drvdata(dev);
+	int ret;
+	struct pwm_chip *chip = dev_get_drvdata(dev);
+	struct pwm_loongson_ddata *ddata = to_pwm_loongson_ddata(chip);
 
-	writel(ls_pwm->ccer_reg, ls_pwm->mmio_base + GTIM_CCER);
-	writel(ls_pwm->ccr_reg[0], ls_pwm->mmio_base + GTIM_CCR(0));
-	writel(ls_pwm->ccr_reg[1], ls_pwm->mmio_base + GTIM_CCR(1));
-	writel(ls_pwm->ccr_reg[2], ls_pwm->mmio_base + GTIM_CCR(2));
-	writel(ls_pwm->ccr_reg[3], ls_pwm->mmio_base + GTIM_CCR(3));
-	writel(ls_pwm->arr_reg, ls_pwm->mmio_base + GTIM_ARR);
+	ret = clk_prepare_enable(ddata->clk);
+	if (ret)
+		return ret;
+
+	pwm_loongson_writel(ddata, ddata->lss.ccer_reg, GTIM_CCER);
+	pwm_loongson_writel(ddata, ddata->lss.ccr_reg[0], GTIM_CCR(0));
+	pwm_loongson_writel(ddata, ddata->lss.ccr_reg[1], GTIM_CCR(1));
+	pwm_loongson_writel(ddata, ddata->lss.ccr_reg[2], GTIM_CCR(2));
+	pwm_loongson_writel(ddata, ddata->lss.ccr_reg[3], GTIM_CCR(3));
+	pwm_loongson_writel(ddata, ddata->lss.arr_reg, GTIM_ARR);
+
 	return 0;
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(ls_pwm_gtim_pm_ops, ls_pwm_gtim_suspend,
-			 ls_pwm_gtim_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(ls_pwm_gtim_pm_ops, ls_pwm_gtim_suspend,
+				ls_pwm_gtim_resume);
+
+static struct of_device_id ls_pwm_gtim_id_table[] = {
+	{ .compatible = "loongson,ls2k-pwm-gtim" },
+	{ /* sentinel */ },
+};
+MODULE_DEVICE_TABLE(of, ls_pwm_gtim_id_table);
 
 static struct platform_driver ls_pwm_gtim_driver = {
 	.driver = {
 		.name = "ls-pwm-gtim",
-		.owner = THIS_MODULE,
-		.bus = &platform_bus_type,
-		.pm = &ls_pwm_gtim_pm_ops,
-#ifdef CONFIG_OF
+		.pm = pm_ptr(&ls_pwm_gtim_pm_ops),
 		.of_match_table = of_match_ptr(ls_pwm_gtim_id_table),
-#endif
 	},
 	.probe = ls_pwm_gtim_probe,
-	.remove = ls_pwm_gtim_remove,
 };
 module_platform_driver(ls_pwm_gtim_driver);
 
-MODULE_AUTHOR("Ilikara <3435193369@qq.com>");
 MODULE_DESCRIPTION("Loongson Gtimer Pwm Driver");
+MODULE_AUTHOR("Ilikara <3435193369@qq.com>");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:ls-pwm-gtim");
