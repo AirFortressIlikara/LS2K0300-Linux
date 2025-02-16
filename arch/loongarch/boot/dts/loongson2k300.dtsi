@@ -192,7 +192,7 @@
 			pinctrl-single,bits = <0xc 0x0000f000 0x0000f000>;
 		};
 
-		spi0_pins: pinmux_G60_G63_as_spi1 {
+		spi0_pins: pinmux_G56_G59_as_spi0 {
 			pinctrl-single,bits = <0xc 0x00ff0000 0x00ff0000
 						0x10 0x00001400 0x00003c00>;
 		};
@@ -246,20 +246,151 @@
 						0x14 0x00000003 0x00000003>;
 		};
 
-		pwm0_pins: pinmux_G86_as_pwm0 {
-			pinctrl-single,bits = <0x14 0x00002000 0x00003000>;
+		atim1_pin: atim1-pin {
+			atim1_pin_m0: pinmux_G28_as_atim1 {
+				pinctrl-single,bits = <0x4 0x02000000 0x03000000>;
+			};
+			atim1_pin_m1: pinmux_G81_as_atim1 {
+				pinctrl-single,bits = <0x14 0x0000000c 0x0000000c>;
+			};
 		};
 
-		pwm1_pins: pinmux_G87_as_pwm1 {
-			pinctrl-single,bits = <0x14 0x00008000 0x0000c000>;
+		atim2_pin: atim2-pin {
+			atim2_pin_m0: pinmux_G29_as_atim1 {
+				pinctrl-single,bits = <0x4 0x08000000 0x0c000000>;
+			};
+			atim2_pin_m1: pinmux_G82_as_atim1 {
+				pinctrl-single,bits = <0x14 0x00000030 0x00000030>;
+			};
 		};
 
-		pwm2_pins: pinmux_G88_as_pwm2 {
-			pinctrl-single,bits = <0x14 0x00020000 0x00030000>;
+		atim3_pin: atim3-pin {
+			atim3_pin_m0: pinmux_G30_as_atim3 {
+				pinctrl-single,bits = <0x4 0x20000000 0x30000000>;
+			};
+			atim3_pin_m1: pinmux_G83_as_atim3 {
+				pinctrl-single,bits = <0x14 0x000000c0 0x000000c0>;
+			};
 		};
 
-		pwm3_pins: pinmux_G89_as_pwm3 {
-			pinctrl-single,bits = <0x14 0x00080000 0x000c0000>;
+		atim1n_pin: atim1n-pin {
+			atim1n_pin_m0: pinmux_G31_as_atim1n {
+				pinctrl-single,bits = <0x4 0x80000000 0xc0000000>;
+			};
+			atim1n_pin_m1: pinmux_G84_as_atim1n {
+				pinctrl-single,bits = <0x14 0x00000300 0x00000300>;
+			};
+		};
+
+		atim2n_pin: atim2n-pin {
+			atim2n_pin_m0: pinmux_G32_as_atim1n {
+				pinctrl-single,bits = <0x8 0x00000002 0x00000003>;
+			};
+			atim2n_pin_m1: pinmux_G85_as_atim1n {
+				pinctrl-single,bits = <0x14 0x00000c00 0x00000c00>;
+			};
+		};
+
+		atim3n_pin: atim3n-pin {
+			atim3n_pin_m0: pinmux_G33_as_atim1n {
+				pinctrl-single,bits = <0x8 0x00000008 0x0000000c>;
+			};
+			atim3n_pin_m1: pinmux_G86_as_atim1n {
+				pinctrl-single,bits = <0x14 0x00003000 0x00003000>;
+			};
+		};
+
+		atim4_pin: atim4-pin {
+			atim4_pin_m0: pinmux_G76_as_atim4 {
+				pinctrl-single,bits = <0x10 0x01000000 0x03000000>;
+			};
+			atim4_pin_m1: pinmux_G101_as_atim4 {
+				pinctrl-single,bits = <0x18 0x00000400 0x00000c00>;
+			};
+		};
+
+		gtim1_pin: gtim1-pin {
+			gtim1_pin_m0: pinmux_G34_as_gtim1 {
+				pinctrl-single,bits = <0x8 0x00000020 0x00000030>;
+			};
+			gtim1_pin_m1: pinmux_G87_as_gtim1 {
+				pinctrl-single,bits = <0x14 0x0000c000 0x0000c000>;
+			};
+		};
+
+		gtim2_pin: gtim2-pin {
+			gtim2_pin_m0: pinmux_G35_as_gtim1 {
+				pinctrl-single,bits = <0x8 0x00000080 0x000000c0>;
+			};
+			gtim2_pin_m1: pinmux_G88_as_gtim1 {
+				pinctrl-single,bits = <0x14 0x00030000 0x00030000>;
+			};
+		};
+
+		gtim3_pin: gtim3-pin {
+			gtim3_pin_m0: pinmux_G36_as_gtim3 {
+				pinctrl-single,bits = <0x8 0x00000200 0x00000300>;
+			};
+			gtim3_pin_m1: pinmux_G89_as_gtim3 {
+				pinctrl-single,bits = <0x14 0x000c0000 0x000c0000>;
+			};
+		};
+
+		gtim4_pin: gtim4-pin {
+			gtim4_pin_m0: pinmux_G77_as_gtim4 {
+				pinctrl-single,bits = <0x10 0x04000000 0x0c000000>;
+			};
+			gtim4_pin_m1: pinmux_G102_as_gtim4 {
+				pinctrl-single,bits = <0x18 0x00001000 0x00003000>;
+			};
+		};
+
+		pwm0_pins: pwm0-pins {
+			pwm0_mux_m0: pinmux_G64_as_pwm0 {
+				pinctrl-single,bits = <0x10 0x00000001 0x00000003>;
+			};
+			pwm0_mux_m1: pinmux_G86_as_pwm0 {
+				pinctrl-single,bits = <0x14 0x00002000 0x00003000>;
+			};
+			pwm0_mux_m2: pinmux_G102_as_pwm0 {
+				pinctrl-single,bits = <0x18 0x00003000 0x00003000>;
+			};
+		};
+
+		pwm1_pins: pwm1-pins {
+			pwm1_mux_m0: pinmux_G65_as_pwm1 {
+				pinctrl-single,bits = <0x10 0x00000004 0x0000000c>;
+			};
+			pwm1_mux_m1: pinmux_G87_as_pwm1 {
+				pinctrl-single,bits = <0x14 0x00008000 0x0000c000>;
+			};
+			pwm1_mux_m2: pinmux_G103_as_pwm1 {
+				pinctrl-single,bits = <0x18 0x0000c000 0x0000c000>;
+			};
+		};
+		
+		pwm2_pins: pwm2-pins {
+			pwm2_mux_m0: pinmux_G66_as_pwm2 {
+				pinctrl-single,bits = <0x10 0x00000010 0x00000030>;
+			};
+			pwm2_mux_m1: pinmux_G88_as_pwm2 {
+				pinctrl-single,bits = <0x14 0x00020000 0x00030000>;
+			};
+			pwm2_mux_m2: pinmux_G104_as_pwm2 {
+				pinctrl-single,bits = <0x18 0x00030000 0x00030000>;
+			};
+		};
+
+		pwm3_pins: pwm3-pins {
+			pwm3_mux_m0: pinmux_G67_as_pwm3 {
+				pinctrl-single,bits = <0x10 0x00000040 0x000000c0>;
+			};
+			pwm3_mux_m1: pinmux_G89_as_pwm3 {
+				pinctrl-single,bits = <0x14 0x00080000 0x000c0000>;
+			};
+			pwm3_mux_m2: pinmux_G105_as_pwm3 {
+				pinctrl-single,bits = <0x18 0x000c0000 0x000c0000>;
+			};
 		};
 
 		tim1_ch1:pinmux_G81_as_tim1_ch1 {
@@ -334,6 +465,9 @@
 			interrupt-parent = <&liointc0>;
 			interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
 			no-loopback-test;
+			pinctrl-0 = <&uart0_pins>;
+			pinctrl-names = "default";
+			status = "disabled";
 		};
 
 		uart1: serial@0x16100400 {
@@ -789,13 +923,37 @@
 			/* Optional for that dr_mode = "host" or dr_mode = "peripheral" */
 		};
 
+		pwm_atim: pwm@16118000{
+			compatible = "loongson,ls2k-pwm-atim";
+			reg = <0 0x16118000 0 0x1000>;
+			interrupt-parent = <&liointc0>;
+			interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
+			#pwm-cells = <2>;
+			pinctrl-0 = <&atim3_pin_m1>, <&atim3n_pin_m1>;
+			pinctrl-names = "default";
+			clock-frequency = <200000000>;
+			status = "disabled";
+		};
+		
+		pwm_gtim: pwm@16119000{
+			compatible = "loongson,ls2k-pwm-gtim";
+			reg = <0 0x16119000 0 0x1000>;
+			interrupt-parent = <&liointc0>;
+			interrupts = <14 IRQ_TYPE_LEVEL_HIGH>;
+			#pwm-cells = <2>;
+			pinctrl-0 = <&gtim2_pin_m1>, <&gtim3_pin_m1>;
+			pinctrl-names = "default";
+			clock-frequency = <200000000>;
+			status = "disabled";
+		};
+
 		pwm0: pwm@0x1611b000 {
 			compatible = "loongson,ls2k-pwm";
 			reg = <0 0x1611b000 0 0xf>;
 			interrupt-parent = <&liointc0>;
 			interrupts = <16 IRQ_TYPE_LEVEL_HIGH>;
 			#pwm-cells = <2>;
-			pinctrl-0 = <&pwm0_pins>;
+			pinctrl-0 = <&pwm0_mux_m0>;
 			pinctrl-names = "default";
 			clock-frequency = <200000000>;
 			status = "disabled";
@@ -807,7 +965,7 @@
 			interrupt-parent = <&liointc0>;
 			interrupts = <16 IRQ_TYPE_LEVEL_HIGH>;
 			#pwm-cells = <2>;
-			pinctrl-0 = <&pwm1_pins>;
+			pinctrl-0 = <&pwm1_mux_m0>;
 			pinctrl-names = "default";
 			clock-frequency = <200000000>;
 			status = "disabled";
@@ -819,7 +977,7 @@
 			interrupt-parent = <&liointc0>;
 			interrupts = <17 IRQ_TYPE_LEVEL_HIGH>;
 			#pwm-cells = <2>;
-			pinctrl-0 = <&pwm2_pins>;
+			pinctrl-0 = <&pwm2_mux_m0>;
 			pinctrl-names = "default";
 			clock-frequency = <200000000>;
 			status = "disabled";
@@ -831,7 +989,7 @@
 			interrupt-parent = <&liointc0>;
 			interrupts = <17 IRQ_TYPE_LEVEL_HIGH>;
 			#pwm-cells = <2>;
-			pinctrl-0 = <&pwm3_pins>;
+			pinctrl-0 = <&pwm3_mux_m0>;
 			pinctrl-names = "default";
 			clock-frequency = <200000000>;
 			status = "disabled";
@@ -891,7 +1049,7 @@
 			compatible = "loongson,ls-pcm-generic-audio";
 			reg = <0 0x16114000 0 0x4000>;
 			dmas = <&dma 0 0xaf
-			        &dma 1 0xbf>;
+					&dma 1 0xbf>;
 			dma-names = "i2s_record", "i2s_play";
 			dma-mask = <0xffffffff 0xffffffff>;
 			status = "disabled";

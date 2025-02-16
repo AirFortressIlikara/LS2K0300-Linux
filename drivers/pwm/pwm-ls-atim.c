@@ -2,7 +2,7 @@
  * @Author: ilikara 3435193369@qq.com
  * @Date: 2024-12-02 07:23:11
  * @LastEditors: ilikara 3435193369@qq.com
- * @LastEditTime: 2025-02-16 02:44:16
+ * @LastEditTime: 2025-02-16 14:34:15
  * @FilePath: /LS2K0300-Linux/drivers/pwm/pwm-ls-atim.c
  * @Description:
  *
@@ -129,8 +129,12 @@ static void ls_pwm_atim_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	val &= ~(0b111 * CCMR_OCnM(pwm->hwpwm));
 	pwm_loongson_writel(ddata, val, ATIM_CCMR(pwm->hwpwm));
 
+	val = pwm_loongson_readl(ddata, ATIM_CCER);
+	val &= ~CCER_CCnE(pwm->hwpwm);
+	pwm_loongson_writel(ddata, val, ATIM_CCER);
+
 	ddata->lss.en_mark &= ~BIT(pwm->hwpwm);
-	if (ddata->lss.en_mark == 0b0000) {
+	if (ddata->lss.en_mark == 0b00000000) {
 		val = pwm_loongson_readl(ddata, ATIM_CR1);
 		val &= ~CR1_CEN;
 		pwm_loongson_writel(ddata, val, ATIM_CR1);
@@ -156,13 +160,14 @@ static int ls_pwm_atim_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 	val |= CCER_CCnE(pwm->hwpwm);
 	pwm_loongson_writel(ddata, val, ATIM_CCER);
 
-	if (ddata->lss.en_mark == 0b0000) {
+	if (ddata->lss.en_mark == 0b00000000) {
 		pwm_loongson_writel(ddata, 0x0, ATIM_CNT);
 		val = pwm_loongson_readl(ddata, ATIM_CR1);
 		val |= CR1_CEN;
 		pwm_loongson_writel(ddata, val, ATIM_CR1);
 	}
 	ddata->lss.en_mark |= BIT(pwm->hwpwm);
+
 	return 0;
 }
 
@@ -179,6 +184,11 @@ static int ls_pwm_atim_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	/* period = period_ns * ddata->clk_rate / NSEC_PER_SEC */
 	period = mul_u64_u64_div_u64(period_ns, ddata->clk_rate, NSEC_PER_SEC);
 	pwm_loongson_writel(ddata, period, ATIM_ARR);
+
+	pwm_loongson_writel(ddata, 0, ATIM_CNT);
+
+	ddata->lss.ccr_reg[pwm->hwpwm % 4] = duty;
+	ddata->lss.arr_reg = period;
 
 	return 0;
 }
@@ -250,7 +260,7 @@ static int ls_pwm_atim_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	u32 of_clk_freq = 0;
 
-	chip = devm_pwmchip_alloc(dev, 1, sizeof(*ddata));
+	chip = devm_pwmchip_alloc(dev, 8, sizeof(*ddata));
 	if (IS_ERR(chip))
 		return PTR_ERR(chip);
 	ddata = to_pwm_loongson_ddata(chip);
@@ -287,7 +297,6 @@ static int ls_pwm_atim_probe(struct platform_device *pdev)
 	pwm_loongson_writel(ddata, BDTR_MOE, ATIM_BDTR);
 
 	chip->ops = &ls_pwm_atim_ops;
-	chip->npwm = 8;
 	chip->atomic = true;
 	dev_set_drvdata(dev, chip);
 

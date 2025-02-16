@@ -7,24 +7,48 @@
 #include "loongson_panel_param.dtsi"
 
 / {
+	model = "LS2K300-99PAI";
+
 	chosen {
 		stdout-path = "serial0:115200n8";
 		bootargs = "earlycon";
 	};
 
 	/* not need memory node, we get memory info from boot params. */
+	memory {
+		name = "memory";
+		device_type = "memory";
+		reg =  <0 0x00200000 0 0x0ee00000
+			0 0x90000000 0 0x10000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		linux,cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0 0x02000000>;
+			linux,cma-default;
+		};
+	};
 };
 
 &uart0 {
 	status = "okay";
+	clock-frequency = <100000000>;
 };
 
 &uart1 {
 	status = "okay";
+	clock-frequency = <100000000>;
 };
 
 &uart2 {
 	status = "okay";
+	clock-frequency = <100000000>;
 };
 
 &gmac0 {
@@ -100,7 +124,7 @@
 };
 
 &spi0 {
-	status = "okay";
+	status = "disabled";
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi0_pins>;
 
@@ -117,6 +141,36 @@
 
 &spi2 {
 	status = "disabled";
+};
+
+&pwm_atim {
+	status = "okay";
+	clock-frequency = <100000000>;
+};
+
+&pwm_gtim {
+	status = "okay";
+	clock-frequency = <100000000>;
+};
+
+&pwm0 {
+	status = "okay";
+	clock-frequency = <100000000>;
+};
+
+&pwm1 {
+	status = "okay";
+	clock-frequency = <100000000>;
+};
+
+&pwm2 {
+	status = "okay";
+	clock-frequency = <100000000>;
+};
+
+&pwm3 {
+	status = "okay";
+	clock-frequency = <100000000>;
 };
 
 &can2 {
@@ -147,4 +201,8 @@
 
 &dc {
 	status = "disabled";
-}
+};
+
+&tsensor {
+	status = "disabled";
+};
