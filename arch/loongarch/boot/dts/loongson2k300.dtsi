@@ -201,6 +201,10 @@
 			pinctrl-single,bits = <0xc 0xff000000 0xff000000>;
 		};
 
+		spi1_cs_as_gpio: pinmux_G60_G62_as_spi1 {
+			pinctrl-single,bits = <0xc 0x3f000000 0x3f000000>;
+		};
+
 		spi2_pins: pinmux_G64_G67_as_spi2 {
 			pinctrl-single,bits = <0x10 0x000000ff 0x000000ff>;
 		};

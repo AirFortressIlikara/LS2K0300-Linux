@@ -139,6 +139,8 @@ static const struct drm_simple_display_pipe_funcs st7735r_pipe_funcs = {
 static const struct st7735r_cfg jd_t18003_t01_cfg = {
 	.mode		= { DRM_SIMPLE_MODE(128, 160, 28, 35) },
 	/* Cannot read from Adafruit 1.8" display via SPI */
+	.left_offset	= 1,
+	.top_offset	= 2,
 	.write_only	= true,
 };
 
