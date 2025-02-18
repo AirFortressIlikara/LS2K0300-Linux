@@ -148,6 +148,16 @@
         dc-gpios = <&gpio 51 GPIO_ACTIVE_HIGH>;
         reset-gpios = <&gpio 50 GPIO_ACTIVE_HIGH>;
     };
+
+	st7789v@0{ // Use TinyDRM Driver
+        status = "disabled";
+		compatible = "sitronix,st7789v_240x320";
+		reg = <0>;
+		spi-max-frequency = <100000000>;
+		rotation = <90>;
+        dc-gpios = <&gpio 51 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&gpio 50 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &spi2 {
